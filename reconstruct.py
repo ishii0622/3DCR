@@ -158,19 +158,52 @@ def main():
     for i in range(iter_num):
         print('iteration', i)
         optimizer.zero_grad()
-        loss = error(mynet(ray_mat, intensity), real_imgs)
+        out = mynet(ray_mat, intensity)
+        loss = error(out, real_imgs)
         loss.backward()
         optimizer.step()
 
     end = time.perf_counter()
 
     print('amount time =', end-start)
-    # print(loss.item())
+    
     # ----------------------------------------
     # clipping weight
     # ----------------------------------------
     for p in mynet.parameters():
         p.data.clamp_(math.log(0.01), 0)
+
+    # ----------------------------------------
+    # calculate rmse
+    # ----------------------------------------
+    trans = torch.exp(mynet.conv3d.weight.data.detach())
+    trans = trans.to('cpu')
+    alpha_loss = rmse(trans.squeeze(), alpha_I)
+    print('alpha_loss', torch.sqrt(alpha_loss))
+
+    # ----------------------------------------
+    # generate image from brightness value
+    # ----------------------------------------
+    imgs_out = MultiImgs(out.float().clamp_(0, 1).cpu().unsqueeze(0))
+    if imgs_out.color == 1:
+        imgs_out.stat = torch.squeeze(imgs_out.stat)
+    imgs_E = est.tensor2imglist(imgs_out.adapt())
+    for i in range(input_imgs.layer):
+        if i < 10:
+            util.imsave(imgs_E[i], os.path.join(out_path, '0'+str(i)+'_'+model_name+'.bmp'))
+        else:
+            util.imsave(imgs_E[i], os.path.join(out_path, str(i) + '_' + model_name + '.bmp'))
+
+    # ----------------------------------------
+    # generate image from transmittance
+    # ----------------------------------------
+    imgs_trans = est.tensor2imglist(trans)
+    for i in range(input_imgs.layer):
+        if i < 10:
+            util.imsave(imgs_trans[i], os.path.join(out_path, 'est_trans_0' + str(i) + '.bmp'))
+        else:
+            util.imsave(imgs_trans[i], os.path.join(out_path, 'est_trans_' + str(i) + '.bmp'))
+
 
 if __name__ == '__main__':
     main()
