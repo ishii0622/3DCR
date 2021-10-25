@@ -171,3 +171,6 @@ def main():
     # ----------------------------------------
     for p in mynet.parameters():
         p.data.clamp_(math.log(0.01), 0)
+
+if __name__ == '__main__':
+    main()
