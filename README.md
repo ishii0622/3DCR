@@ -7,7 +7,7 @@
 1. Execute below command in this repository
 ```bash 
 conda env create -f 3DCR.yml
-conda ctivate 3DCR
+conda activate 3DCR
 ```
 
 ## Usage
