@@ -4,5 +4,13 @@
 ### Prerequisites
 1. Anaconda is installed
 ### Creating a virtual environment
-1. Execute below command in this repository 
-'$ conda env create -f 3DCR.yml'
+1. Execute below command in this repository
+```bash 
+conda env create -f 3DCR.yml
+conda ctivate 3DCR
+```
+
+## Usage
+```bash
+python reconstruct.py
+```
