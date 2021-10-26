@@ -1,5 +1,6 @@
 import torch
 import os
+import csv
 import numpy as np
 import torch.nn as nn
 from utils import utils_image as util
@@ -56,12 +57,11 @@ def main():
     # ----------------------------------------
     target_name = 'simucell1_input'
     apa_size = 5
-    light_area_division = pow(apa_size, 2)
     resolution = 0.92
     NA = 0.75
     model_name = 'ircnn_gray'
 
-    iter_num = 100
+    iter_num = 10
 
     # hyper parameter
     lr = 6.0e-3
@@ -149,11 +149,6 @@ def main():
     # optimizer = torch.optim.Adam(mynet.parameters(), lr=lr)
     rmse = nn.MSELoss(reduction='mean')
 
-    history = {
-        'iter': [],
-        'loss': [],
-    }
-
     start = time.perf_counter()
     for i in range(iter_num):
         print('iteration', i)
@@ -184,26 +179,39 @@ def main():
     # ----------------------------------------
     # generate image from brightness value
     # ----------------------------------------
+    image_path = os.path.join(out_path, 'image')
+    util.mkdir(image_path)
     imgs_out = MultiImgs(out.float().clamp_(0, 1).cpu().unsqueeze(0))
     if imgs_out.color == 1:
         imgs_out.stat = torch.squeeze(imgs_out.stat)
     imgs_E = est.tensor2imglist(imgs_out.adapt())
     for i in range(input_imgs.layer):
         if i < 10:
-            util.imsave(imgs_E[i], os.path.join(out_path, '0'+str(i)+'_'+model_name+'.bmp'))
+            util.imsave(imgs_E[i], os.path.join(image_path, '0'+str(i)+'_'+model_name+'.bmp'))
         else:
-            util.imsave(imgs_E[i], os.path.join(out_path, str(i) + '_' + model_name + '.bmp'))
+            util.imsave(imgs_E[i], os.path.join(image_path, str(i) + '_' + model_name + '.bmp'))
 
     # ----------------------------------------
-    # generate image from transmittance
+    # generate slice from transmittance
     # ----------------------------------------
+    slice_path = os.path.join(out_path, 'slice')
+    util.mkdir(slice_path)
     imgs_trans = est.tensor2imglist(trans)
     for i in range(input_imgs.layer):
         if i < 10:
-            util.imsave(imgs_trans[i], os.path.join(out_path, 'est_trans_0' + str(i) + '.bmp'))
+            util.imsave(imgs_trans[i], os.path.join(slice_path, 'est_trans_0' + str(i) + '.bmp'))
         else:
-            util.imsave(imgs_trans[i], os.path.join(out_path, 'est_trans_' + str(i) + '.bmp'))
+            util.imsave(imgs_trans[i], os.path.join(slice_path, 'est_trans_' + str(i) + '.bmp'))
 
+    # ----------------------------------------
+    # output transmittance as .txt 
+    # ----------------------------------------
+    trans = torch.reshape(trans, (-1,))
+    list_trans = torch.Tensor.tolist(trans)
+    list_str_trans = [str(n) for n in list_trans]
+    voxeldata_path = os.path.join(out_path, 'voxeldata.txt')
+    with open(voxeldata_path, mode='w') as f:
+        f.write(' '.join(list_str_trans))
 
 if __name__ == '__main__':
     main()
