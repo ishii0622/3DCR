@@ -59,14 +59,13 @@ def main():
     apa_size = 5
     resolution = 0.92
     NA = 0.75
-    model_name = 'ircnn_gray'
 
-    iter_num = 10
+    iter_num = 100
 
     # hyper parameter
     lr = 6.0e-3
 
-    n_channels = 3 if 'color' in model_name else 1
+    n_channels = 1
 
     targets = 'inputs/input'
     results = 'results'
@@ -145,8 +144,8 @@ def main():
     mynet = mynet.to(device)
 
     error = nn.MSELoss(reduction='sum')
-    optimizer = torch.optim.SGD(mynet.parameters(), lr=lr)
-    # optimizer = torch.optim.Adam(mynet.parameters(), lr=lr)
+    # optimizer = torch.optim.SGD(mynet.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(mynet.parameters(), lr=lr)
     rmse = nn.MSELoss(reduction='mean')
 
     start = time.perf_counter()
@@ -187,9 +186,9 @@ def main():
     imgs_E = est.tensor2imglist(imgs_out.adapt())
     for i in range(input_imgs.layer):
         if i < 10:
-            util.imsave(imgs_E[i], os.path.join(image_path, '0'+str(i)+'_'+model_name+'.bmp'))
+            util.imsave(imgs_E[i], os.path.join(image_path, '0'+str(i)+'_'+target_name+'.bmp'))
         else:
-            util.imsave(imgs_E[i], os.path.join(image_path, str(i) + '_' + model_name + '.bmp'))
+            util.imsave(imgs_E[i], os.path.join(image_path, str(i)+'_'+target_name+'.bmp'))
 
     # ----------------------------------------
     # generate slice from transmittance
@@ -208,7 +207,7 @@ def main():
     # ----------------------------------------
     trans = torch.reshape(trans, (-1,))
     list_trans = torch.Tensor.tolist(trans)
-    list_str_trans = [str(n) for n in list_trans]
+    list_str_trans = [f'{n:.06f}' for n in list_trans]
     voxeldata_path = os.path.join(out_path, 'voxeldata.txt')
     with open(voxeldata_path, mode='w') as f:
         f.write(' '.join(list_str_trans))
