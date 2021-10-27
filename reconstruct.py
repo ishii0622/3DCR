@@ -8,7 +8,6 @@ from utils import utils_estimate as est
 import time
 import math
 import sys
-import matplotlib.pyplot as plt
 torch.set_printoptions(threshold=np.inf)
 
 class MultiImgs():
