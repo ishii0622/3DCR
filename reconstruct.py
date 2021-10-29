@@ -5,6 +5,7 @@ import numpy as np
 import torch.nn as nn
 from utils import utils_image as util
 from utils import utils_estimate as est
+from total_variation import TotalVariation
 import time
 import math
 import sys
@@ -59,10 +60,11 @@ def main():
     resolution = 0.92
     NA = 0.75
 
-    iter_num = 100
+    iter_num = 1000
 
     # hyper parameter
     lr = 6.0e-3
+    mu = 1.0e-2
 
     n_channels = 1
 
@@ -143,8 +145,9 @@ def main():
     mynet = mynet.to(device)
 
     error = nn.MSELoss(reduction='sum')
-    # optimizer = torch.optim.SGD(mynet.parameters(), lr=lr)
-    optimizer = torch.optim.Adam(mynet.parameters(), lr=lr)
+    tv_loss = TotalVariation(is_mean_reduction=False)   # TODO: ２次元の平滑化までしかできていないため３次元に
+    optimizer = torch.optim.SGD(mynet.parameters(), lr=lr)
+    # optimizer = torch.optim.Adam(mynet.parameters(), lr=lr)
     rmse = nn.MSELoss(reduction='mean')
 
     start = time.perf_counter()
@@ -152,7 +155,7 @@ def main():
         print('iteration', i)
         optimizer.zero_grad()
         out = mynet(ray_mat, intensity)
-        loss = error(out, real_imgs)
+        loss = error(out, real_imgs) + mu * tv_loss(mynet.conv3d.weight.squeeze())
         loss.backward()
         optimizer.step()
 
