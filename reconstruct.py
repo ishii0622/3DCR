@@ -64,7 +64,7 @@ def main():
 
     # hyper parameter
     lr = 6.0e-3
-    mu = 1.0e-4
+    mu = 1.0e-2
 
     n_channels = 1
 
