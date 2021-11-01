@@ -5,42 +5,7 @@ class TotalVariation3D(torch.nn.Module):
     """Calculate the total variation for one or batch tensor.
 
     The total variation is the sum of the absolute differences for neighboring
-    pixel-values in the input images.
-
-    Example:
-    >>> import torch
-    >>> loss_ = TotalVariation()
-
-    >>> # Example for 2-dimensional tensor.
-    >>> tensor_ = torch.arange(0, 2.5, 0.1, requires_grad=True).reshape(5, 5)
-    >>> tensor_.shape
-    torch.Size([5, 5])
-    >>> loss_(tensor_)
-    tensor(12., grad_fn=<AddBackward0>)
-
-    >>> # Example for 3-dimensional tensor.
-    >>> tensor_ = torch.arange(0, 2.5, 0.1, requires_grad=True).reshape(1, 5, 5)
-    >>> tensor_.shape
-    torch.Size([1, 5, 5])
-    >>> loss_(tensor_)
-    tensor(12., grad_fn=<AddBackward0>)
-
-    >>> # Example for 4-dimensional tensor.
-    >>> tensor_ = (
-    ...     torch.arange(0, 10.0, 0.1, requires_grad=True).reshape(4, 1, 5, 5)
-    ... )
-    >>> tensor_.shape
-    torch.Size([4, 1, 5, 5])
-    >>> loss_(tensor_)
-    tensor([12.0000, 12.0000, 12.0000, 12.0000], grad_fn=<AddBackward0>)
-
-    >>> # Example for 4-dimensional tensor with `is_mean_reduction=True`.
-    >>> loss_ = TotalVariation(is_mean_reduction=True)
-    >>> tensor_ = (
-    ...     torch.arange(0, 10.0, 0.1, requires_grad=True).reshape(4, 1, 5, 5)
-    ... )
-    >>> loss_(tensor_)
-    tensor([0.6000, 0.6000, 0.6000, 0.6000], grad_fn=<AddBackward0>)
+    voxel-values in the input multi-focus images.
     """
 
     def __init__(self, *, is_mean_reduction: bool = False) -> None:

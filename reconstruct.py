@@ -55,7 +55,7 @@ def main():
     # ----------------------------------------
     # Preparation
     # ----------------------------------------
-    target_name = 'simucell1_input'
+    target_name = 'phantom1_input'
     apa_size = 5
     resolution = 0.92
     NA = 0.75
@@ -64,7 +64,7 @@ def main():
 
     # hyper parameter
     lr = 6.0e-3
-    mu = 1.0e-2
+    mu = 1.0e-4
 
     n_channels = 1
 
