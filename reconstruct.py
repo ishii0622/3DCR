@@ -5,7 +5,7 @@ import numpy as np
 import torch.nn as nn
 from utils import utils_image as util
 from utils import utils_estimate as est
-from total_variation import TotalVariation
+from total_variation_3d import TotalVariation3D
 import time
 import math
 import sys
@@ -145,7 +145,7 @@ def main():
     mynet = mynet.to(device)
 
     error = nn.MSELoss(reduction='sum')
-    tv_loss = TotalVariation(is_mean_reduction=False)   # TODO: ２次元の平滑化までしかできていないため３次元に
+    tv_loss = TotalVariation3D(is_mean_reduction=False)
     optimizer = torch.optim.SGD(mynet.parameters(), lr=lr)
     # optimizer = torch.optim.Adam(mynet.parameters(), lr=lr)
     rmse = nn.MSELoss(reduction='mean')
@@ -155,7 +155,7 @@ def main():
         print('iteration', i)
         optimizer.zero_grad()
         out = mynet(ray_mat, intensity)
-        loss = error(out, real_imgs) + mu * tv_loss(mynet.conv3d.weight.squeeze())
+        loss = error(out, real_imgs) + mu * tv_loss(mynet.conv3d.weight)
         loss.backward()
         optimizer.step()
 
