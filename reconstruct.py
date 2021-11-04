@@ -60,7 +60,7 @@ def main():
     resolution = 0.92
     NA = 0.75
 
-    iter_num = 1000
+    iter_num = 100
 
     # hyper parameter
     lr = 6.0e-3
@@ -155,7 +155,8 @@ def main():
         print('iteration', i)
         optimizer.zero_grad()
         out = mynet(ray_mat, intensity)
-        loss = error(out, real_imgs) + mu * tv_loss(mynet.conv3d.weight)
+        # loss = error(out, real_imgs) + mu * tv_loss(mynet.conv3d.weight)
+        loss = error(out,real_imgs)
         loss.backward()
         optimizer.step()
 
