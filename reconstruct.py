@@ -37,7 +37,7 @@ def main():
     # ----------------------------------------
     # Preparation
     # ----------------------------------------
-    target_name = 'phantom1_input'
+    target_name = 'simucell1_input'
     apa_size = 5
     resolution = 0.92
     NA = 0.75
@@ -46,7 +46,7 @@ def main():
 
     # hyper parameter
     lr = 6.0e-3
-    mu = 1.0e-2
+    mu = 1.0e-2 / 11
 
     n_channels = 1
 
@@ -117,7 +117,7 @@ def main():
     alpha = torch.unsqueeze(alpha, dim=0)
     alpha = torch.unsqueeze(alpha, dim=0)   # (1, 1, layer, height, width)
     
-    omega = torch.tensor(alpha.clone().detach(), requires_grad=True, device=device) #TODO: omegaの初期化に改善余地あり
+    omega = torch.tensor(alpha.clone().detach(), requires_grad=True, device=device) #TODO: modify omega's initialization method
 
     alpha_I = est.get_transmittance(target_name, nv)
     alpha_I = torch.reshape(alpha_I, (layer, height, width))
@@ -128,9 +128,9 @@ def main():
     print('real_imgs', real_imgs.shape)
 
     error = nn.MSELoss(reduction='sum')
-    # tv_loss = TotalVariation3D(is_mean_reduction=False)
+    tv_loss = TotalVariation3D(is_mean_reduction=False)
     optimizer = torch.optim.SGD([omega], lr=lr)
-    #optimizer = torch.optim.Adam([omega], lr=lr)
+    # optimizer = torch.optim.Adam([omega], lr=lr)
     rmse = nn.MSELoss(reduction='mean')
 
     start = time.perf_counter()
@@ -140,8 +140,7 @@ def main():
         for s in range(layer):
             out = F.conv3d(omega, kernel_list[s], padding=(0, 13, 13)).squeeze()
             out = intensity * torch.sum(torch.exp(out), dim=0).squeeze()
-            # loss = error(out, real_imgs) + mu * tv_loss(mynet.conv3d.weight)
-            loss = error(out,real_imgs[s, :, :])
+            loss = error(out,real_imgs[s, :, :]) + mu * tv_loss(omega) # TODO: TV norm to tmp 
             loss.backward()
         optimizer.step()
 
