@@ -38,15 +38,16 @@ class MyNet(nn.Module):
         self.conv3d = nn.Conv3d(in_channels  = 1, 
                                 out_channels = 1, 
                                 kernel_size  = (layer, height, width), 
-                                bias         = False)
+                                bias         = False
+                                )
 
     def forward(self, x, intensity):
         x = self.conv3d(x)
         x = torch.squeeze(x)
         x = torch.exp(x)
-        x = x * intensity
         x = torch.sum(x, dim=0)
         x = torch.squeeze(x)
+        x = x * intensity
 
         return x
 
@@ -60,7 +61,7 @@ def main():
     resolution = 0.92
     NA = 0.75
 
-    iter_num = 100
+    iter_num = 1000
 
     # hyper parameter
     lr = 6.0e-3
@@ -108,12 +109,13 @@ def main():
     # ----------------------------------------
     # generate the ray matrix
     # ----------------------------------------
-    light_path = est.range_matrix_generation(ray_num, ray_check, input_imgs.layer, diameter, apa_size, resolution)
-    light_path = torch.from_numpy(light_path).clone()    # (ray_num, 2*layer-1, , )
-    print('light_path',light_path.shape)
+    ray_mat = est.range_matrix_generation(ray_num, ray_check, input_imgs.layer, diameter, apa_size, resolution)
+    ray_mat = torch.from_numpy(ray_mat).clone()    # (ray_num, 2*layer-1, , )
+    print('light_path',ray_mat.shape)
 
-    ray_mat = est.adjust_ray(light_path, input_imgs.height, input_imgs.width)
+    ray_mat = est.adjust_ray(ray_mat, input_imgs.height, input_imgs.width)
     ray_mat = torch.unsqueeze(ray_mat, 1)
+    ray_mat = ray_mat.to(torch.float32)
     print('ray matrix', ray_mat.shape)  # (ray_num, 1, 2*layer-1, , )
     print('ray mem', sys.getsizeof(ray_mat.storage()), 'byte')
     
