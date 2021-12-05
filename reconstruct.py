@@ -3,6 +3,7 @@ import os
 import csv
 import numpy as np
 import torch.nn as nn
+import torch.nn.functional as F
 from utils import utils_image as util
 from utils import utils_estimate as est
 from total_variation_3d import TotalVariation3D
@@ -29,27 +30,7 @@ class MultiImgs():
         img = torch.rot90(img, 2, [1, 2])
         for i in range(self.layer):
             sort[i] = img[self.layer-i-1]
-        return sort
-
-
-class MyNet(nn.Module):
-    def __init__(self, layer, height, width):
-        super(MyNet, self).__init__()
-        self.conv3d = nn.Conv3d(in_channels  = 1, 
-                                out_channels = 1, 
-                                kernel_size  = (layer, height, width), 
-                                bias         = False
-                                )
-
-    def forward(self, x, intensity):
-        x = self.conv3d(x)
-        x = torch.squeeze(x)
-        x = torch.exp(x)
-        x = torch.sum(x, dim=0)
-        x = torch.squeeze(x)
-        x = x * intensity
-
-        return x
+        return img
 
 
 def main():
@@ -90,12 +71,15 @@ def main():
     input_imgs = MultiImgs(imgs)
     if input_imgs.color == 1:
         input_imgs.stat = torch.squeeze(input_imgs.stat)
+    width = input_imgs.width
+    height = input_imgs.height
+    layer = input_imgs.layer
     nv = input_imgs.nv()
 
     # ----------------------------------------
     # Discretize incident light
     # ----------------------------------------
-    diameter = est.set_diameter(NA, input_imgs.layer)
+    diameter = est.set_diameter(NA, layer)
     ray_num, ray_check = est.set_incidental_light(diameter, apa_size, resolution)
     intensity = 1/ray_num
 
@@ -109,91 +93,88 @@ def main():
     # ----------------------------------------
     # generate the ray matrix
     # ----------------------------------------
-    ray_mat = est.range_matrix_generation(ray_num, ray_check, input_imgs.layer, diameter, apa_size, resolution)
+    ray_mat = est.range_matrix_generation(ray_num, ray_check, layer, diameter, apa_size, resolution)
     ray_mat = torch.from_numpy(ray_mat).clone()    # (ray_num, 2*layer-1, , )
     print('light_path',ray_mat.shape)
 
-    ray_mat = est.adjust_ray(ray_mat, input_imgs.height, input_imgs.width)
     ray_mat = torch.unsqueeze(ray_mat, 1)
     ray_mat = ray_mat.to(torch.float32)
     print('ray matrix', ray_mat.shape)  # (ray_num, 1, 2*layer-1, , )
     print('ray mem', sys.getsizeof(ray_mat.storage()), 'byte')
     
     ray_mat = ray_mat.to(device)
-
+    kernel_list = []
+    for s in range(layer):
+        kernel_list.append(ray_mat[:, :, s:s+layer, :, :])
+    print(kernel_list[0].shape)
     # ----------------------------------------
     # setting trans object
     # ----------------------------------------
     alpha = est.default_transmittance(0, input_imgs.stat)
     print('alpha', alpha.shape)
 
-    omega = torch.log(alpha)
-    omega = torch.unsqueeze(omega, dim=0)
-    omega = torch.unsqueeze(omega, dim=0)   # (1, 1, layer, height, width)
+    alpha = torch.log(alpha)
+    alpha = torch.unsqueeze(alpha, dim=0)
+    alpha = torch.unsqueeze(alpha, dim=0)   # (1, 1, layer, height, width)
+    
+    omega = torch.tensor(alpha.clone().detach(), requires_grad=True, device=device) #TODO: omegaの初期化に改善余地あり
 
     alpha_I = est.get_transmittance(target_name, nv)
-    alpha_I = torch.reshape(alpha_I, (input_imgs.layer, input_imgs.height, input_imgs.width))
+    alpha_I = torch.reshape(alpha_I, (layer, height, width))
     print(alpha_I.shape)
 
-    real_imgs = input_imgs.adapt()
+    real_imgs = input_imgs.stat
     real_imgs = real_imgs.to(device)
     print('real_imgs', real_imgs.shape)
 
-    # ----------------------------------------
-    # setting network
-    # ----------------------------------------
-    mynet = MyNet(input_imgs.layer, input_imgs.height, input_imgs.width)
-    mynet.conv3d.weight.data = nn.Parameter(omega)
-    mynet = mynet.to(device)
-
     error = nn.MSELoss(reduction='sum')
-    tv_loss = TotalVariation3D(is_mean_reduction=False)
-    optimizer = torch.optim.SGD(mynet.parameters(), lr=lr)
-    # optimizer = torch.optim.Adam(mynet.parameters(), lr=lr)
+    # tv_loss = TotalVariation3D(is_mean_reduction=False)
+    optimizer = torch.optim.SGD([omega], lr=lr)
+    #optimizer = torch.optim.Adam([omega], lr=lr)
     rmse = nn.MSELoss(reduction='mean')
 
     start = time.perf_counter()
     for i in range(iter_num):
         print('iteration', i)
         optimizer.zero_grad()
-        out = mynet(ray_mat, intensity)
-        # loss = error(out, real_imgs) + mu * tv_loss(mynet.conv3d.weight)
-        loss = error(out,real_imgs)
-        loss.backward()
+        for s in range(layer):
+            out = F.conv3d(omega, kernel_list[s], padding=(0, 13, 13)).squeeze()
+            out = intensity * torch.sum(torch.exp(out), dim=0).squeeze()
+            # loss = error(out, real_imgs) + mu * tv_loss(mynet.conv3d.weight)
+            loss = error(out,real_imgs[s, :, :])
+            loss.backward()
         optimizer.step()
 
     end = time.perf_counter()
 
-    print('amount time =', end-start)
-    
     # ----------------------------------------
     # clipping weight
     # ----------------------------------------
-    for p in mynet.parameters():
-        p.data.clamp_(math.log(0.01), 0)
-
+    omega = torch.clip(omega, min=math.log(0.01), max=0)
+    
     # ----------------------------------------
     # calculate rmse
     # ----------------------------------------
-    trans = torch.exp(mynet.conv3d.weight.data.detach())
+    trans = torch.exp(omega.detach())
     trans = trans.to('cpu')
     alpha_loss = rmse(trans.squeeze(), alpha_I)
     print('alpha_loss', torch.sqrt(alpha_loss))
-
+    print('amount time =', end-start)
+    
     # ----------------------------------------
     # generate image from brightness value
     # ----------------------------------------
-    image_path = os.path.join(out_path, 'image')
-    util.mkdir(image_path)
-    imgs_out = MultiImgs(out.float().clamp_(0, 1).cpu().unsqueeze(0))
-    if imgs_out.color == 1:
-        imgs_out.stat = torch.squeeze(imgs_out.stat)
-    imgs_E = est.tensor2imglist(imgs_out.adapt())
-    for i in range(input_imgs.layer):
-        if i < 10:
-            util.imsave(imgs_E[i], os.path.join(image_path, '0'+str(i)+'_'+target_name+'.bmp'))
-        else:
-            util.imsave(imgs_E[i], os.path.join(image_path, str(i)+'_'+target_name+'.bmp'))
+    # image_path = os.path.join(out_path, 'image')
+    # util.mkdir(image_path)
+    # imgs_out = MultiImgs(out.float().clamp_(0, 1).cpu().unsqueeze(0))
+    # if imgs_out.color == 1:
+    #     imgs_out.stat = torch.squeeze(imgs_out.stat)
+    # imgs_E = est.tensor2imglist(imgs_out.adapt())
+    # for i in range(input_imgs.layer):
+    #     if i < 10:
+    #         util.imsave(imgs_E[i], os.path.join(image_path, '0'+str(i)+'_'+target_name+'.bmp'))
+    #     else:
+    #         util.imsave(imgs_E[i], os.path.join(image_path, str(i)+'_'+target_name+'.bmp'))
 
     # ----------------------------------------
     # generate slice from transmittance
