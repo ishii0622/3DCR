@@ -37,7 +37,7 @@ def main():
     # ----------------------------------------
     # Preparation
     # ----------------------------------------
-    target_name = 'phantom1_input'
+    target_name = 'simucell1_input'
     apa_size = 5
     resolution = 0.92
     NA = 0.75
@@ -97,7 +97,6 @@ def main():
     # ----------------------------------------
     ray_mat = est.range_matrix_generation(ray_num, ray_check, layer, diameter, apa_size, resolution)
     ray_mat = torch.from_numpy(ray_mat).clone()    # (ray_num, 2*layer-1, , )
-    print('light_path',ray_mat.shape)
 
     ray_mat = torch.unsqueeze(ray_mat, 1)
     ray_mat = ray_mat.to(torch.float32)
@@ -108,12 +107,11 @@ def main():
     kernel_list = []
     for s in range(layer):
         kernel_list.append(ray_mat[:, :, s:s+layer, :, :])
-    print(kernel_list[0].shape)
+
     # ----------------------------------------
     # setting trans object
     # ----------------------------------------
     alpha = est.default_transmittance(0, input_imgs.stat)
-    print('alpha', alpha.shape)
 
     alpha = torch.log(alpha)
     alpha = torch.unsqueeze(alpha, dim=0)
@@ -123,11 +121,9 @@ def main():
 
     alpha_I = est.get_transmittance(target_name, nv)
     alpha_I = torch.reshape(alpha_I, (layer, height, width))
-    print(alpha_I.shape)
 
     real_imgs = input_imgs.stat
     real_imgs = real_imgs.to(device)
-    print('real_imgs', real_imgs.shape)
 
     error = nn.MSELoss(reduction='sum')
     tv_loss = TotalVariation3D(is_mean_reduction=False)
@@ -136,6 +132,7 @@ def main():
     rmse = nn.MSELoss(reduction='mean')
 
     est_imgs = []
+    loss_sum = 0
 
     start = time.perf_counter()
     for i in range(iter_num):
@@ -149,6 +146,7 @@ def main():
             loss.backward()
             if i==iter_num-1:
                 est_imgs.append(out.cpu())
+                loss_sum = loss_sum + loss.cpu().item()
         optimizer.step()
 
     end = time.perf_counter()
@@ -164,8 +162,10 @@ def main():
     trans = torch.exp(omega.detach())
     trans = trans.to('cpu')
     alpha_loss = rmse(trans.squeeze(), alpha_I)
-    print('alpha_loss', torch.sqrt(alpha_loss))
-    print('amount time =', end-start)
+    eval_index = torch.sqrt(alpha_loss).item()
+    print('RMSE=', eval_index)
+    calc_time = end-start
+    print('amount time =', calc_time)
     
     # ----------------------------------------
     # generate image from brightness value
@@ -201,6 +201,18 @@ def main():
     voxeldata_path = os.path.join(out_path, 'voxeldata.txt')
     with open(voxeldata_path, mode='w') as f:
         f.write(' '.join(list_str_trans))
+
+    # ----------------------------------------
+    # output log as .txt 
+    # ----------------------------------------
+    log_path = os.path.join(out_path, 'log.txt')
+    with open(log_path, mode='w') as f:
+        f.write('iteration      : '+ str(iter_num) + '\n')
+        f.write('learnig rate   : '+ str(lr) + '\n')
+        f.write('mu             : '+ str(mu*layer) + '\n')
+        f.write('Loss value     : '+ str(loss_sum) + '\n')
+        f.write('Calculate time : '+ str(calc_time) + '\n')
+        f.write('RMSE           : '+ str(eval_index) + '\n')
 
 if __name__ == '__main__':
     main()
