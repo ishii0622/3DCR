@@ -37,7 +37,7 @@ def main():
     # ----------------------------------------
     # Preparation
     # ----------------------------------------
-    target_name = 'simucell1_input'
+    target_name = 'phantom1_input'
     apa_size = 5
     resolution = 0.92
     NA = 0.75
@@ -46,7 +46,7 @@ def main():
 
     # hyper parameter
     lr = 6.0e-3
-    mu = 1.0e-2 / 11
+    mu = 1.0e-2
 
     n_channels = 1
 
@@ -75,6 +75,8 @@ def main():
     height = input_imgs.height
     layer = input_imgs.layer
     nv = input_imgs.nv()
+    
+    mu = mu/layer
 
     # ----------------------------------------
     # Discretize incident light
@@ -133,6 +135,8 @@ def main():
     # optimizer = torch.optim.Adam([omega], lr=lr)
     rmse = nn.MSELoss(reduction='mean')
 
+    est_imgs = []
+
     start = time.perf_counter()
     for i in range(iter_num):
         print('iteration', i)
@@ -140,8 +144,11 @@ def main():
         for s in range(layer):
             out = F.conv3d(omega, kernel_list[s], padding=(0, 13, 13)).squeeze()
             out = intensity * torch.sum(torch.exp(out), dim=0).squeeze()
+            # loss = error(out,real_imgs[s, :, :])
             loss = error(out,real_imgs[s, :, :]) + mu * tv_loss(omega) # TODO: TV norm to tmp 
             loss.backward()
+            if i==iter_num-1:
+                est_imgs.append(out.cpu())
         optimizer.step()
 
     end = time.perf_counter()
@@ -163,17 +170,15 @@ def main():
     # ----------------------------------------
     # generate image from brightness value
     # ----------------------------------------
-    # image_path = os.path.join(out_path, 'image')
-    # util.mkdir(image_path)
-    # imgs_out = MultiImgs(out.float().clamp_(0, 1).cpu().unsqueeze(0))
-    # if imgs_out.color == 1:
-    #     imgs_out.stat = torch.squeeze(imgs_out.stat)
-    # imgs_E = est.tensor2imglist(imgs_out.adapt())
-    # for i in range(input_imgs.layer):
-    #     if i < 10:
-    #         util.imsave(imgs_E[i], os.path.join(image_path, '0'+str(i)+'_'+target_name+'.bmp'))
-    #     else:
-    #         util.imsave(imgs_E[i], os.path.join(image_path, str(i)+'_'+target_name+'.bmp'))
+    image_path = os.path.join(out_path, 'image')
+    util.mkdir(image_path)
+    for i, img in enumerate(est_imgs):
+        img = img.data.squeeze().float().clamp_(0, 1).numpy()
+        img = np.uint8((img*255.0).round())
+        if i < 10:
+            util.imsave(img, os.path.join(image_path, '0'+str(i)+'_'+target_name+'.bmp'))
+        else:
+            util.imsave(img, os.path.join(image_path, str(i)+'_'+target_name+'.bmp'))
 
     # ----------------------------------------
     # generate slice from transmittance
@@ -181,7 +186,7 @@ def main():
     slice_path = os.path.join(out_path, 'slice')
     util.mkdir(slice_path)
     imgs_trans = est.tensor2imglist(trans)
-    for i in range(input_imgs.layer):
+    for i in range(layer):
         if i < 10:
             util.imsave(imgs_trans[i], os.path.join(slice_path, 'est_trans_0' + str(i) + '.bmp'))
         else:
