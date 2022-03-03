@@ -46,7 +46,7 @@ def main():
 
     # hyper parameter
     lr = 6.0e-3
-    mu = 1.0e-2
+    mu = 1.0e-3
 
     n_channels = 1
 
@@ -176,10 +176,9 @@ def main():
         img = img.data.squeeze().float().clamp_(0, 1).numpy()
         img = np.uint8((img*255.0).round())
         if i < 10:
-            util.imsave(img, os.path.join(image_path, '0'+str(i)+'_'+target_name+'.bmp'))
+            util.imsave(img, os.path.join(image_path, target_name + '_0'+ str(i) + '.bmp'))
         else:
-            util.imsave(img, os.path.join(image_path, str(i)+'_'+target_name+'.bmp'))
-
+            util.imsave(img, os.path.join(image_path, target_name + '_' + str(i) + '.bmp'))
     # ----------------------------------------
     # generate slice from transmittance
     # ----------------------------------------
