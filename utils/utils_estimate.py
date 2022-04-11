@@ -20,8 +20,10 @@ def imglist2tensor(img_list):
 
 
 def tensor2imglist(imgs):
-    imgs = imgs.data.squeeze().float().clamp_(0, 1).numpy()
-    return np.uint8((imgs*255.0).round())
+    imgs = imgs.data.squeeze().float().clamp_(0, 1)
+    if imgs.dim()==4:
+        imgs = imgs.permute(1, 2, 3, 0)  # CNHW -> NHWC
+    return np.uint8((imgs.numpy()*255.0).round())
 
 
 def set_diameter(NA, layer_num):
