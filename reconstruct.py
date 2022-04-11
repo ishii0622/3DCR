@@ -82,7 +82,7 @@ def main():
     # Discretize incident light
     # ----------------------------------------
     diameter = est.set_diameter(NA, layer)
-    ray_num, ray_check = est.set_incidental_light(diameter, apa_size, resolution)
+    ray_num, ray_check = est.set_incidental_light(diameter, apa_size)
     intensity = 1/ray_num
 
     # ----------------------------------------
@@ -106,7 +106,7 @@ def main():
     ray_mat = ray_mat.to(device)
     kernel_list = []
     for s in range(layer):
-        kernel_list.append(ray_mat[:, :, s:s+layer, :, :])
+        kernel_list.append(ray_mat[:, :, layer-1-s:2*layer-1-s, :, :])
 
     # ----------------------------------------
     # setting trans object

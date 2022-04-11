@@ -30,22 +30,11 @@ def set_diameter(NA, layer_num):
     return diameter
 
 
-def set_criscross(diameter):
-    if math.ceil(diameter)%2==0:
-        crisscross = math.ceil(diameter)+1
-    else:
-        crisscross = math.ceil(diameter)
-    return crisscross
-
-
-def set_incidental_light(diameter, num_div, scale):
-    diameter = diameter / scale
-    area_size = set_criscross(diameter)
-
+def set_incidental_light(diameter, num_div):
     num_div = int(num_div)
     radius = diameter/2
-    center = area_size/2
-    offset = area_size/num_div
+    center = diameter/2
+    offset = diameter/num_div
 
     a = np.zeros((num_div, num_div))
     ray_check = []
@@ -66,6 +55,14 @@ def set_incidental_light(diameter, num_div, scale):
     return Nr, ray_check
 
 
+def set_areasize(diameter):
+    if math.ceil(diameter)%2==0:
+        areasize = math.ceil(diameter)+1
+    else:
+        areasize = math.ceil(diameter)
+    return areasize
+
+
 def boundary_decision(pre, now):
     """
     boundary_decision
@@ -76,21 +73,23 @@ def boundary_decision(pre, now):
     return judge
 
 
-def range_matrix_generation(ray_number, ray_check, layer_num, diameter, apa_size, resolution=0.92):
+def range_matrix_generation(ray_number, ray_check, layer_num, diameter, apa_size, resolution):
     """
     range_matrix_generation
     """
     depth = 2*layer_num-1
-    CRISSCROSS = set_criscross(diameter/resolution)
-    offset = CRISSCROSS / apa_size
-    center = CRISSCROSS / 2
-    p = [0]
-    z_step = 1/resolution  # 1.0869565173913175
+    voxel_side_num = diameter / resolution
+    areasize = set_areasize(voxel_side_num)
+    
+    center = areasize * resolution / 2
+    offset = diameter / apa_size
 
+    p = [0]
     sign_x = sign_y = 0
     check_line_x = check_line_y = 0
+    gap = (areasize * resolution - diameter) / 2
 
-    light_path = np.zeros((ray_number, depth, CRISSCROSS, CRISSCROSS))
+    light_path = np.zeros((ray_number, depth, areasize, areasize))
 
     for n in range(0, math.ceil(apa_size/2), 1):
         # print('n =', n)
@@ -107,16 +106,16 @@ def range_matrix_generation(ray_number, ray_check, layer_num, diameter, apa_size
                 ray_sym3 = ray_check[(apa_size - 1 - n) * apa_size + (apa_size - 1 - m)]
                 # print(ray_iter, ray_sym1, ray_sym2, ray_sym3)
                 for z_iter in range(0, layer_num+1, 1):
-                    z1 = (depth - z_iter) * z_step
-                    k1 = 2 * z1 / (depth * z_step) - 1
-                    y1 = center + k1 * ((n + 0.5) * offset - center)
-                    x1 = center + k1 * ((m + 0.5) * offset - center)
+                    z1 = (depth - z_iter)
+                    k1 = 2 * z1 / depth - 1
+                    y1 = center + k1 * ((n + 0.5) * offset + gap - center)
+                    x1 = center + k1 * ((m + 0.5) * offset + gap - center)
                     # print("(x1,y1,z1) =", x1, y1, z1)
 
                     check = 0
                     x2 = y2 = x3 = y3 = 0
-                    z2 = -100 * z_step
-                    z3 = -200 * z_step
+                    z2 = -100
+                    z3 = -200
 
                     if count == 0:
                         p[0] = x1
@@ -130,15 +129,15 @@ def range_matrix_generation(ray_number, ray_check, layer_num, diameter, apa_size
                         pre_z = p[(count - 1) * 3 + 2]
                         i = j = 0
                         nx = ny = 0
-                        if boundary_decision(pre_x, x1):
-                            nx = math.floor(x1) - math.floor(pre_x)
-                            sign_x = 1
-                            check_line_x = 1
+                        if boundary_decision(pre_x/resolution, x1/resolution):
+                            nx = math.floor(x1/resolution) - math.floor(pre_x/resolution)
+                            sign_x = resolution
+                            check_line_x = resolution
                             check = 1
-                        if boundary_decision(pre_y, y1):
-                            ny = math.floor(y1) - math.floor(pre_y)
-                            sign_y = 1
-                            check_line_y = 1
+                        if boundary_decision(pre_y/resolution, y1/resolution):
+                            ny = math.floor(y1/resolution) - math.floor(pre_y/resolution)
+                            sign_y = resolution
+                            check_line_y = resolution
                             if check != 1:
                                 check = 2
                             else:
@@ -146,25 +145,25 @@ def range_matrix_generation(ray_number, ray_check, layer_num, diameter, apa_size
 
                         while (i < nx) or (j < ny):
                             if ((check == 1) or (check == 3)) and (nx > 0):
-                                x2 = math.floor(pre_x) + sign_x * i + check_line_x
-                                if (m + 0.5) * offset - center != 0:
-                                    k2 = (x2 - center) / ((m + 0.5) * offset - center)
+                                x2 = math.floor(pre_x/resolution) * resolution + sign_x * i + check_line_x
+                                if (m + 0.5) * offset + gap - center != 0:
+                                    k2 = (x2 - center) / ((m + 0.5) * offset + gap - center)
                                 else:
                                     k2 = 0
-                                y2 = center + k2 * ((n + 0.5) * offset - center)
-                                z2 = (k2 + 1) * depth * z_step / 2
+                                y2 = center + k2 * ((n + 0.5) * offset + gap - center)
+                                z2 = (k2 + 1) * depth / 2
 
                             if ((check == 2) or (check == 3)) and (ny > 0):
-                                y3 = math.floor(pre_y) + sign_y * j + check_line_y
-                                if (n + 0.5) * offset - center != 0:
-                                    k3 = (y3 - center) / ((n + 0.5) * offset - center)
+                                y3 = math.floor(pre_y/resolution) * resolution + sign_y * j + check_line_y
+                                if (n + 0.5) * offset + gap - center != 0:
+                                    k3 = (y3 - center) / ((n + 0.5) * offset + gap - center)
                                 else:
                                     k3 = 0
-                                x3 = center + k3 * ((m + 0.5) * offset - center)
-                                z3 = (k3 + 1) * depth * z_step / 2
+                                x3 = center + k3 * ((m + 0.5) * offset + gap - center)
+                                z3 = (k3 + 1) * depth / 2
 
                             if z2 > z3:
-                                if (z2 <= 21 * z_step) and (z2 >= 0) and (z2 != pre_z):
+                                if (z2 <= depth) and (z2 >= 0) and (z2 != pre_z):
                                     p.append(x2)
                                     p.append(y2)
                                     p.append(z2)
@@ -173,7 +172,7 @@ def range_matrix_generation(ray_number, ray_check, layer_num, diameter, apa_size
                                 check = 1
 
                             elif z2 < z3:
-                                if (z3 <= 21 * z_step) and (z3 >= 0) and (z3 != pre_z):
+                                if (z3 <= depth) and (z3 >= 0) and (z3 != pre_z):
                                     p.append(x3)
                                     p.append(y3)
                                     p.append(z3)
@@ -182,7 +181,7 @@ def range_matrix_generation(ray_number, ray_check, layer_num, diameter, apa_size
                                 check = 2
 
                             else:
-                                if (z2 <= 21 * z_step) and (z2 >= 0) and (z2 != pre_z) and (z3 <= 21 * z_step) and (z3 >= 0) and (z3 != pre_z):
+                                if (z2 <= depth) and (z2 >= 0) and (z2 != pre_z) and (z3 <= depth) and (z3 >= 0) and (z3 != pre_z):
                                     p.append(x2)
                                     p.append(y2)
                                     p.append(z2)
@@ -203,21 +202,21 @@ def range_matrix_generation(ray_number, ray_check, layer_num, diameter, apa_size
                             Y2 = p[(k+1) * 3 + 1]
                             Z2 = p[(k+1) * 3 + 2]
 
-                            d = math.sqrt((X1 - X2) ** 2 + (Y1 - Y2) ** 2 + (Z1 - Z2) ** 2) * resolution
+                            d = math.sqrt((X1 - X2) ** 2 + (Y1 - Y2) ** 2 + (Z1 - Z2) ** 2)
                             # print('z_iter', z_iter, 'distance', d)
 
-                            z_tmp = Z1 * resolution
+                            z_tmp = Z1
 
                             z_point = z_iter - 1
                             z_point_sym = depth - z_point - 1
-                            y_point = math.floor(Y1)
-                            y_point_sym = CRISSCROSS - 1 - math.floor(Y1)
-                            x_point = math.floor(X1)
-                            x_point_sym = CRISSCROSS - 1 - math.floor(X1)
+                            y_point = math.floor(Y1/resolution)
+                            y_point_sym = areasize - 1 - math.floor(Y1/resolution)
+                            x_point = math.floor(X1/resolution)
+                            x_point_sym = areasize - 1 - math.floor(X1/resolution)
 
-                            vox_iter = z_point * (CRISSCROSS**2) + y_point * CRISSCROSS + x_point
+                            vox_iter = z_point * (areasize**2) + y_point * areasize + x_point
 
-                            if 0 <= math.floor(X1) < CRISSCROSS and 0 <= math.floor(Y1) < CRISSCROSS:
+                            if 0 <= math.floor(X1/resolution) < areasize and 0 <= math.floor(Y1/resolution) < areasize:
                                 if z_tmp > 0 and d != 0:
                                     if vox_iter != vox_iter2:
                                         light_path[ray_iter, z_point, y_point, x_point] = d
@@ -274,7 +273,7 @@ def get_transmittance(target_name, nv):
     root = "../inputs/voxeldata/" + target + "_voxdata.txt"
     path /= root
     path = Path(path)
-    print(path)
+    # print(path)
     with open(path) as f:
         contents = f.read().split()
 
@@ -292,12 +291,12 @@ def default_transmittance(flag, img):
     img:size[nv]
     :return: transmittance
     """
-    a = torch.zeros_like(img)
     if flag == 0:
         a = torch.pow(img, 1/img.size()[0])
         a = a.to(torch.float32)
 
     elif flag == 1:
+        a = torch.ones_like(img)
         a = a * 0.75
         a = a.to(torch.float32)
 
@@ -308,25 +307,27 @@ def main():
     layer = 11
     resolution = 0.92
     NA = 0.75
-    for i in range(50):
-        apa_size = 2*i + 1
-        diameter = set_diameter(NA, layer)
-        ray_num, ray_check = set_incidental_light(diameter, apa_size, resolution)
-        light_path = range_matrix_generation(ray_num, ray_check, layer, diameter, apa_size, resolution)
-        light_path = torch.from_numpy(light_path).clone()    # (ray_num, 2*layer-1, , )
-        print('i=', apa_size, 'light_path',light_path.shape)
-    # z = light_path.size()[1]
-    # y = light_path.size()[2]
-    # x = light_path.size()[3]
-    # count = 0
-    # for m in range(z):
-    #     for j in range(y):
-    #         for k in range(x):
-    #             if light_path[4, m, j, k]!=0:
-    #                 print(4, m, j, k)
-    #                 print(light_path[4,m, j, k])
-    #                 count+=light_path[4, m, j, k]
-    # print('count', count)
+    
+    apa_size = 5
+    diameter = set_diameter(NA, layer)
+    print('diameter', diameter)
+    ray_num, ray_check = set_incidental_light(diameter, apa_size)
+    light_path = range_matrix_generation(ray_num, ray_check, layer, diameter, apa_size, resolution)
+    light_path = torch.from_numpy(light_path).clone()    # (ray_num, 2*layer-1, , )
+    print('div_num=', apa_size, 'light_path',light_path.shape)
+    z = light_path.size()[1]
+    y = light_path.size()[2]
+    x = light_path.size()[3]
+    count = 0
+    ray = 0
+    for m in range(z):
+        for j in range(y):
+            for k in range(x):
+                if light_path[ray, m, j, k]!=0:
+                    print(ray, m, j, k)
+                    print(light_path[ray, m, j, k])
+                    count+=light_path[ray, m, j, k]
+    print('count', count)
 
 
 if __name__ == '__main__':
