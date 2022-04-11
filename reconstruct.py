@@ -24,28 +24,22 @@ class MultiImgs():
         total = self.layer*self.height*self.width
         return total
 
-    def adapt(self):
-        img = self.stat
-        sort = torch.zeros(self.layer, self.height, self.width)
-        img = torch.rot90(img, 2, [1, 2])
-        for i in range(self.layer):
-            sort[i] = img[self.layer-i-1]
-        return img
-
 
 def main():
     # ----------------------------------------
     # Preparation
     # ----------------------------------------
     target_name = 'simucell1_input'
-    apa_size = 5
+    apa_size = 25
     resolution = 0.92
     NA = 0.75
 
     iter_num = 1000
 
+    # optimizer: Adam or GD
+    optim = 'Adam'
+
     # hyper parameter
-    lr = 6.0e-3
     mu = 1.0e-3
 
     n_channels = 1
@@ -127,8 +121,12 @@ def main():
 
     error = nn.MSELoss(reduction='sum')
     tv_loss = TotalVariation3D(is_mean_reduction=False)
-    optimizer = torch.optim.SGD([omega], lr=lr)
-    # optimizer = torch.optim.Adam([omega], lr=lr)
+    if 'GD'in optim:
+        lr = 6.0e-3
+        optimizer = torch.optim.SGD([omega], lr=lr)
+    elif 'Adam' in optim:
+        lr = 5.0e-3
+        optimizer = torch.optim.Adam([omega], lr=lr)
     rmse = nn.MSELoss(reduction='mean')
 
     est_imgs = []
