@@ -42,8 +42,9 @@ def main():
     # hyper parameter
     mu = 1.0e-3
 
-    n_channels = 1
+    n_channels = 3
 
+    color = 'color' if n_channels==3 else 'gray'
     targets = 'inputs/input_realcell'
     results = 'results'
 
@@ -82,7 +83,7 @@ def main():
     # ----------------------------------------
     # out_path
     # ----------------------------------------
-    result_name = target_name + '_ray' + str(ray_num) + '_gray'
+    result_name = target_name + '_ray' + str(ray_num) + '_' + color
     out_path = os.path.join(results, result_name)  # path for Estimated images
     util.mkdir(out_path)
 
@@ -113,7 +114,6 @@ def main():
         alpha = torch.unsqueeze(alpha, dim=0)   # (1, 1, layer, height, width)
     elif n_channels == 3:
         alpha = torch.unsqueeze(alpha, dim=1)   # (3, 1, layer, height, width)
-        # alpha = torch.unsqueeze(alpha, dim=1)   # (3, 1, 1, layer, height, width)
     
     omega = torch.tensor(alpha.clone().detach(), requires_grad=True, device=device) #TODO: modify omega's initialization method
 
@@ -200,7 +200,6 @@ def main():
     slice_path = os.path.join(out_path, 'slice')
     util.mkdir(slice_path)
     imgs_trans = est.tensor2imglist(trans)
-    print('trans', imgs_trans.shape)
     for i in range(layer):
         if i < 10:
             util.imsave(imgs_trans[i], os.path.join(slice_path, 'est_trans_0' + str(i) + '.bmp'))

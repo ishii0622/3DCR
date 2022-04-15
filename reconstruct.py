@@ -44,6 +44,7 @@ def main():
 
     n_channels = 1
 
+    color = 'color' if n_channels==3 else 'gray'
     targets = 'inputs/input'
     results = 'results'
 
@@ -82,7 +83,7 @@ def main():
     # ----------------------------------------
     # out_path
     # ----------------------------------------
-    result_name = target_name + '_ray' + str(ray_num)
+    result_name = target_name + '_ray' + str(ray_num) + '_' + color
     out_path = os.path.join(results, result_name)  # path for Estimated images
     util.mkdir(out_path)
 
@@ -108,8 +109,11 @@ def main():
     alpha = est.default_transmittance(0, input_imgs.stat)
 
     alpha = torch.log(alpha)
-    alpha = torch.unsqueeze(alpha, dim=0)
-    alpha = torch.unsqueeze(alpha, dim=0)   # (1, 1, layer, height, width)
+    if n_channels == 1:
+        alpha = torch.unsqueeze(alpha, dim=0)
+        alpha = torch.unsqueeze(alpha, dim=0)   # (1, 1, layer, height, width)
+    elif n_channels == 3:
+        alpha = torch.unsqueeze(alpha, dim=1)   # (3, 1, layer, height, width)
     
     omega = torch.tensor(alpha.clone().detach(), requires_grad=True, device=device) #TODO: modify omega's initialization method
 
@@ -133,19 +137,35 @@ def main():
     loss_sum = 0
 
     start = time.perf_counter()
-    for i in range(iter_num):
-        print('iteration', i)
-        optimizer.zero_grad()
-        for s in range(layer):
-            out = F.conv3d(omega, kernel_list[s], padding=(0, 13, 13)).squeeze()
-            out = intensity * torch.sum(torch.exp(out), dim=0).squeeze()
-            # loss = error(out,real_imgs[s, :, :])
-            loss = error(out,real_imgs[s, :, :]) + mu * tv_loss(omega) # TODO: TV norm to tmp 
-            loss.backward()
-            if i==iter_num-1:
-                est_imgs.append(out.cpu())
-                loss_sum = loss_sum + loss.cpu().item()
-        optimizer.step()
+    if n_channels == 1:
+        for i in range(iter_num):
+            print('iteration', i)
+            optimizer.zero_grad()
+            for s in range(layer):
+                out = F.conv3d(omega, kernel_list[s], padding=(0, 13, 13)).squeeze()
+                out = intensity * torch.sum(torch.exp(out), dim=0).squeeze()
+                # loss = error(out,real_imgs[s, :, :])
+                loss = error(out,real_imgs[s, :, :]) + mu * tv_loss(omega) # TODO: TV norm to tmp 
+                loss.backward()
+                if i==iter_num-1:
+                    est_imgs.append(out.cpu())
+                    loss_sum = loss_sum + loss.cpu().item()
+            optimizer.step()
+
+    elif n_channels == 3:
+        for i in range(iter_num):
+            print('iteration', i)
+            optimizer.zero_grad()
+            for s in range(layer):
+                out = F.conv3d(omega, kernel_list[s], padding=(0, 13, 13)).squeeze()
+                out = intensity * torch.sum(torch.exp(out), dim=1).squeeze()
+                # loss = error(out,real_imgs[:, s, :, :])
+                loss = error(out,real_imgs[:, s, :, :]) + mu * torch.sum(tv_loss(omega)) # TODO: TV norm to tmp 
+                loss.backward()
+                if i==iter_num-1:
+                    est_imgs.append(out.cpu())
+                    loss_sum = loss_sum + loss.cpu().item()
+            optimizer.step()
 
     end = time.perf_counter()
 
@@ -171,6 +191,8 @@ def main():
     image_path = os.path.join(out_path, 'image')
     util.mkdir(image_path)
     for i, img in enumerate(est_imgs):
+        if img.dim()==3:
+            img = torch.permute(img,(1,2,0))
         img = img.data.squeeze().float().clamp_(0, 1).numpy()
         img = np.uint8((img*255.0).round())
         if i < 10:
