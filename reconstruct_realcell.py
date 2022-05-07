@@ -95,6 +95,7 @@ def main():
 
     ray_mat = torch.unsqueeze(ray_mat, 1)
     ray_mat = ray_mat.to(torch.float32)
+    padding_size = (ray_mat.size()[3]-1)/2
     print('ray matrix', ray_mat.shape)  # (ray_num, 1, 2*layer-1, , )
     print('ray mem', sys.getsizeof(ray_mat.storage()), 'byte')
     
@@ -139,7 +140,7 @@ def main():
             print('iteration', i)
             optimizer.zero_grad()
             for s in range(layer):
-                out = F.conv3d(omega, kernel_list[s], padding=(0, 13, 13)).squeeze()
+                out = F.conv3d(omega, kernel_list[s], padding=(0, padding_size, padding_size)).squeeze()
                 out = intensity * torch.sum(torch.exp(out), dim=0).squeeze()
                 # loss = error(out,real_imgs[s, :, :])
                 loss = error(out,real_imgs[s, :, :]) + mu * tv_loss(omega) # TODO: TV norm to tmp 
@@ -154,7 +155,7 @@ def main():
             print('iteration', i)
             optimizer.zero_grad()
             for s in range(layer):
-                out = F.conv3d(omega, kernel_list[s], padding=(0, 13, 13)).squeeze()
+                out = F.conv3d(omega, kernel_list[s], padding=(0, padding_size, padding_size)).squeeze()
                 out = intensity * torch.sum(torch.exp(out), dim=1).squeeze()
                 # loss = error(out,real_imgs[:, s, :, :])
                 loss = error(out,real_imgs[:, s, :, :]) + mu * torch.sum(tv_loss(omega)) # TODO: TV norm to tmp 
