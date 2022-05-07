@@ -4,7 +4,6 @@ import numpy as np
 from pathlib import Path
 import math
 
-
 def imglist2tensor(img_list):
     for idx, img in enumerate(img_list):
         if idx == 0:
@@ -306,6 +305,7 @@ def default_transmittance(flag, img):
 
 
 def main():
+    import utils_voxel as voxel
     layer = 11
     resolution = 0.92
     NA = 0.75
@@ -315,6 +315,12 @@ def main():
     print('diameter', diameter)
     ray_num, ray_check = set_incidental_light(diameter, apa_size)
     light_path = range_matrix_generation(ray_num, ray_check, layer, diameter, apa_size, resolution)
+    for ray in range(2):
+        if ray==0:
+            tmp = light_path[ray, :, :, :]
+        else:
+            tmp = tmp + light_path[ray, :, :, :]
+    voxel.draw3d(tmp)
     light_path = torch.from_numpy(light_path).clone()    # (ray_num, 2*layer-1, , )
     print('div_num=', apa_size, 'light_path',light_path.shape)
     z = light_path.size()[1]
